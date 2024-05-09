@@ -188,3 +188,51 @@ async def delete_product(product_id: int):
 
     finally:
         await close_connection(connection)
+
+
+@router.get("/products/category/{category}", response_model=List[Product], tags=["Category"])
+async def get_products_by_category(category: str):
+    connection = await get_connection()
+    cursor = await connection.cursor()
+
+    try:
+        today = datetime.now().strftime('%Y-%m-%d')
+        await cursor.execute("SELECT * FROM products WHERE productCategory = %s AND productExpiry >= %s", (category, today))
+        products = await cursor.fetchall()
+
+        if not products:
+            raise HTTPException(status_code=404, detail="No products found for the category")
+
+        return [dict_to_product(product) for product in products]
+
+    except aiomysql.Error as err:
+        print(f"Error retrieving products by category: {err}")
+        raise HTTPException(status_code=500, detail="Internal Server Error")
+
+    finally:
+        await close_connection(connection)
+
+
+@router.get("/categories", response_model=List[str], tags=["Category"])
+async def get_categories():
+    connection = await get_connection()
+    cursor = await connection.cursor()
+
+    try:
+        await cursor.execute("SELECT DISTINCT productCategory FROM products")
+        categories = await cursor.fetchall()
+
+        if not categories:
+            return []
+
+        return [category[0] for category in categories if category and category[0]]
+
+    except aiomysql.Error as err:
+        print(f"Error retrieving categories: {err}")
+        raise HTTPException(status_code=500, detail="Internal Server Error")
+
+    finally:
+        await close_connection(connection)
+
+
+
